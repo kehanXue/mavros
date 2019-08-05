@@ -19,6 +19,7 @@
 #include <eigen_conversions/eigen_msg.h>
 
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/Point.h>
 
 #include <mavros_msgs/SetMavFrame.h>
 #include <mavros_msgs/GlobalPositionTarget.h>
@@ -74,6 +75,8 @@ public:
 		}
 		mav_frame_srv = sp_nh.advertiseService("mav_frame", &SetpointPositionPlugin::set_mav_frame_cb, this);
 
+		gps2enu_pub = sp_nh.advertise<geometry_msgs::Point>("/point_goal", 10);
+
 		// mav_frame
 		std::string mav_frame_str;
 		if (!sp_nh.getParam("mav_frame", mav_frame_str)) {
@@ -98,6 +101,9 @@ private:
 	ros::Subscriber setpointg_sub;	//!< GPS setpoint
 	ros::Subscriber gps_sub;	//!< current GPS
 	ros::Subscriber local_sub;	//!< current local ENU
+
+	ros::Publisher gps2enu_pub;
+
 	ros::ServiceServer mav_frame_srv;
 
 	/* Stores current gps state. */
@@ -223,6 +229,14 @@ private:
 		sp.translation() = current_local_pos + enu_offset;
 		// set desired orientation
 		sp.linear() = q.toRotationMatrix();
+
+		ROS_INFO("Publish point goal message!");
+		geometry_msgs::Point point_goal;
+		point_goal.x = sp.translation()(0);
+		point_goal.y = sp.translation()(1);
+		point_goal.z = sp.translation()(2);
+		gps2enu_pub.publish(point_goal);
+
 
 		// Only send if current gps is updated, to avoid divergence
 		if ((req->header.stamp.toNSec() / 1000000) > old_gps_stamp) {
